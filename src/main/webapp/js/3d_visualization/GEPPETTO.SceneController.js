@@ -190,6 +190,10 @@ define(function(require) {
 										{
 											object.ghosted = false;
 											object.material.opacity = object.material.defaultOpacity;
+											if(object.material.opacity==1)
+											{
+												object.material.transparent = false;
+											}
 										}
 									}
 								});
@@ -198,6 +202,10 @@ define(function(require) {
 							{
 								child.ghosted = false;
 								child.material.opacity = child.material.defaultOpacity;
+								if(child.material.opacity==1)
+								{
+									child.material.transparent = false;
+								}
 							}
 						}
 					}
@@ -280,7 +288,6 @@ define(function(require) {
 								}
 							});
 							mesh.selected = false;
-							mesh.ghosted = false;
 						}
 					} 
 					else 
@@ -288,7 +295,6 @@ define(function(require) {
 						mesh.material.color.set(mesh.material.defaultColor);
 						mesh.material.opacity = mesh.material.defaultOpacity;
 						mesh.selected = false;
-						mesh.ghosted = false;
 					}
 					return true;
 				}
@@ -604,15 +610,15 @@ define(function(require) {
 						// if there are nodes still selected, give it a ghost
 						// effect. If not nodes are
 						// selected, give the meshes old default color
-						if (G.getSelection().length > 0) {
+
+						if (G.getSelectionOptions().unselected_transparent) 
+						{
 							mesh.material.transparent = true;
 							mesh.material.opacity = GEPPETTO.Resources.OPACITY.GHOST;
 							mesh.ghosted = true;
-						} else {
-							GEPPETTO.SceneController.setThreeColor(mesh.material.color,mesh.material.defaultColor);
-							mesh.material.transparent = true;
-							mesh.material.opacity = GEPPETTO.Resources.OPACITY.DEFAULT;
-						}
+						} 
+						GEPPETTO.SceneController.setThreeColor(mesh.material.color,mesh.material.defaultColor);
+
 					}
 					// if mesh is selected, make it look like so
 					else {
@@ -833,29 +839,22 @@ define(function(require) {
 						// get object from visualizationtree by using the object's
 						// instance path as search key
 						var object = GEPPETTO.get3DObjectInVisualizationTree(visualizationTree, map[v]);
-						// get group elements list for object
-						var objectsGroups = object.groups;
-						for (g in objectsGroups) 
-						{
-							if (objectsGroups[g] in groups) 
+						
+						// If it is a segment compare to the id otherwise check in the visual groups
+						if (object.id in groups){
+							// true means don't add to mesh with non-groups visual objects
+							added = GEPPETTO.SceneController.addMeshToGeometryGroup(aspectInstancePath, object.id, geometryGroups, m)
+						}
+						else{
+							// get group elements list for object
+							var objectsGroups = object.groups;
+							for (var g in objectsGroups) 
 							{
-								// name of group, mix of aspect path and group name
-								var groupName = aspectInstancePath + "." + objectsGroups[g];
-								// retrieve corresponding geometry for this group
-								var geometry = geometryGroups[groupName];
-								// only merge if flag is set to true
-								if(m instanceof THREE.Line) 
+								if (objectsGroups[g] in groups) 
 								{
-									geometry.vertices.push(m.geometry.vertices[0]);
-									geometry.vertices.push(m.geometry.vertices[1]);
+									// true means don't add to mesh with non-groups visual objects
+									added = GEPPETTO.SceneController.addMeshToGeometryGroup(aspectInstancePath, objectsGroups[g], geometryGroups, m)
 								}
-								else
-								{
-									// merged mesh into corresponding geometry
-									geometry.merge(m.geometry, m.matrix);
-								}
-								// true means don't add to mesh with non-groups visual objects
-								added = true;
 							}
 						}
 	
@@ -882,6 +881,39 @@ define(function(require) {
 				groups[aspectInstancePath] = {};
 				groups[aspectInstancePath].color = GEPPETTO.Resources.COLORS.SPLIT;
 				GEPPETTO.SceneController.createGroupMeshes(aspectInstancePath, geometryGroups, groups);
+			},
+			
+			/**
+			 * Add mesh to geometry groups
+			 * 
+			 * @param {String}
+			 *            aspectInstancePath - Path of aspect, corresponds to
+			 *            original merged mesh
+			 * @param {String}
+			 *            id - local path to the group
+			 * @param {object}
+			 *            groups - The groups that we need to split mesh into
+			 * @param {object}
+			 *            m - current mesh     
+			 */
+			addMeshToGeometryGroup : function(aspectInstancePath, id, geometryGroups, m)
+			{
+				// name of group, mix of aspect path and group name
+				var groupName = aspectInstancePath + "." + id;
+				// retrieve corresponding geometry for this group
+				var geometry = geometryGroups[groupName];
+				// only merge if flag is set to true
+				if(m instanceof THREE.Line) 
+				{
+					geometry.vertices.push(m.geometry.vertices[0]);
+					geometry.vertices.push(m.geometry.vertices[1]);
+				}
+				else
+				{
+					// merged mesh into corresponding geometry
+					geometry.merge(m.geometry, m.matrix);
+				}
+				return true;
 			},
 
 			/**
